@@ -3,6 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta property="og:type" content="website">
+<meta property="og:title" content="AlgoRitmo">
+<meta property="og:description" content="Segnati per il giovedì e le squadre si fanno da sole. Equilibrate, con i colori delle maglie e la cassa.">
+<meta property="og:url" content="https://giovanni-iapichino.github.io/Algoritmo-Calcetto/">
+<meta property="og:image" content="https://giovanni-iapichino.github.io/Algoritmo-Calcetto/anteprima.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="it_IT">
+<meta property="og:site_name" content="AlgoRitmo">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="description" content="Le squadre del calcetto del giovedì a Limbiate, equilibrate in automatico.">
 <meta name="theme-color" content="#0F2A20">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -149,6 +160,16 @@ input,textarea{font-family:var(--body);font-size:1rem}
 .eq .bars{display:flex;flex-direction:column;gap:3px}
 .eq .b{height:6px;border-radius:3px;min-width:2px;transition:width .45s cubic-bezier(.2,.8,.2,1)}
 
+.campo{margin:6px 0 18px;border:1px solid var(--linea);border-radius:14px;overflow:hidden;background:#143324}
+.campo svg{display:block;width:100%;height:auto}
+.campo .didascalia{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:11px 14px;border-top:1px solid var(--linea);background:var(--pitch-2);
+  font-family:var(--num);font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  font-size:11px;color:var(--muted);
+}
+.campo .didascalia .chi{display:flex;align-items:center;gap:6px;color:var(--chalk);font-size:13px;letter-spacing:.02em}
+.campo .didascalia .pall{width:10px;height:10px;border-radius:50%;flex:none;border:1px solid rgba(241,245,234,.5)}
 .teams{display:grid;gap:14px}
 @media(min-width:600px){.teams{grid-template-columns:1fr 1fr}.teams.tre{grid-template-columns:1fr 1fr 1fr}}
 .team{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--pitch-2)}
@@ -232,7 +253,7 @@ code{background:var(--pitch);padding:1px 5px;border-radius:4px;font-size:14px}
 
 <header class="top">
   <div class="tt">
-    <div class="eyebrow">Limbiate · <span id="ver">v10</span></div>
+    <div class="eyebrow">Limbiate · <span id="ver">v11</span></div>
     <h1>Algo<em>Ritmo</em></h1>
     <div class="claim">L'app ufficiale del calcetto del giovedì</div>
   </div>
@@ -1159,6 +1180,112 @@ function commentoEsito(k){
   if(max <= 4) return 'Scarto medio, ci sta.';
   return 'Scarto largo: se ricapita con questi nomi, forse qualche voto va rivisto.';
 }
+/* =====================================================================
+   Lo schieramento: non è un modulo, è la fotografia dei ruoli scelti.
+   Quattro fasce per metà campo, ognuno nella sua, larga quanto serve.
+   ===================================================================== */
+function nomiBrevi(gente){
+  const quanti = {};
+  gente.forEach(p => { const n = p.nome.trim().split(/\s+/)[0].toLowerCase(); quanti[n] = (quanti[n]||0)+1; });
+  const out = {};
+  gente.forEach(p => {
+    const parti = p.nome.trim().split(/\s+/);
+    out[p.id] = (quanti[parti[0].toLowerCase()] > 1 && parti[1])
+      ? parti[0] + ' ' + parti[1][0].toUpperCase() + '.'
+      : parti[0];
+  });
+  return out;
+}
+function fasce(sq){
+  const por = sq.filter(p => p.ruolo === 'por');
+  const resto = sq.filter(p => p.ruolo !== 'por');
+  if(!por.length){                       // nessuno dichiarato portiere: vale la spunta
+    const i = resto.findIndex(p => p.gk);
+    if(i >= 0) por.push(resto.splice(i,1)[0]);
+  }
+  return [por,
+          resto.filter(p => p.ruolo === 'dif'),
+          resto.filter(p => p.ruolo === 'cen' || p.ruolo === 'ind' || !p.ruolo),
+          resto.filter(p => p.ruolo === 'att')];
+}
+const L = 340, A = 500, META = A/2;      // misure del disegno
+
+function pallini(sq, casacca, indice, versoBasso, brevi){
+  const q = fasce(sq);
+  const prof = [0.055, 0.20, 0.44, 0.76];   // porta, difesa, centrocampo, attacco
+  let out = '';
+  q.forEach((gruppo, f) => {
+    if(!gruppo.length) return;
+    const y = versoBasso ? META * prof[f] : A - META * prof[f];
+    const passo = L / (gruppo.length + 1);
+    const fs = Math.max(9, Math.min(13, passo / 4.2));      // più sono, più piccolo
+    const maxLettere = Math.floor(passo / (fs * 0.46));
+    const r = gruppo.length > 6 ? 9 : 11;
+    gruppo.forEach((p, i) => {
+      const x = passo * (i + 1);
+      let nome = brevi[p.id];
+      if(nome.length > maxLettere) nome = nome.slice(0, Math.max(3, maxLettere - 1)) + '.';
+      const mio = p.id === io;
+      const vuoto = (p.ruolo === 'ind' || !p.ruolo) && !p.gk;
+      const riempi = casacca.col.startsWith('linear-gradient') ? `url(#sfuma${indice})` : casacca.col;
+      out += `<g>
+        <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}"
+          fill="${riempi}" stroke="${mio ? '#FFD44A' : 'rgba(241,245,234,.7)'}"
+          stroke-width="${mio ? 3 : 1.6}" ${vuoto ? 'stroke-dasharray="3 2.5"' : ''}></circle>
+        <text x="${x.toFixed(1)}" y="${(versoBasso ? y + r + 13 : y - r - 6).toFixed(1)}" text-anchor="middle"
+          font-family="Barlow Semi Condensed, sans-serif" font-size="${fs.toFixed(1)}"
+          font-weight="${mio ? 600 : 400}" fill="${mio ? '#FFD44A' : '#F1F5EA'}"
+          >${esc(nome)}</text>
+      </g>`;
+    });
+  });
+  return out;
+}
+
+function schieramento(teams, k){
+  const [a, b] = calendario(k)[0];          // nel triangolare si mostra la prima partita
+  const inCampo = [teams[a], teams[b]];
+  const casacche = [CASACCHE[a], CASACCHE[b]];
+  const brevi = nomiBrevi(teams.flat());
+  const linea = 'rgba(241,245,234,.3)';
+
+  const sfumature = casacche.map((c, i) => c.col.startsWith('linear-gradient')
+    ? `<linearGradient id="sfuma${i}" x1="0" y1="0" x2="1" y2="1">
+         <stop offset="0" stop-color="#FF6A2B"/><stop offset=".38" stop-color="#FFD44A"/>
+         <stop offset=".7" stop-color="#35C07A"/><stop offset="1" stop-color="#43B7DF"/>
+       </linearGradient>` : '').join('');
+
+  const fuori = k === 3
+    ? `<span>Fuori nella 1ª</span>
+       <span class="chi"><span class="pall" style="background:${CASACCHE[3-a-b].col}"></span>${CASACCHE[3-a-b].nome}:
+       ${teams[3-a-b].map(p => esc(brevi[p.id])).join(', ')}</span>` : '';
+
+  return `<div class="campo">
+    <svg viewBox="0 0 ${L} ${A}" role="img"
+         aria-label="Schieramento di ${casacche[0].nome} contro ${casacche[1].nome}">
+      <defs>${sfumature}</defs>
+      <rect width="${L}" height="${A}" fill="#143324"></rect>
+      ${Array.from({length:6},(_,i)=>`<rect x="0" y="${i*A/6}" width="${L}" height="${A/12}" fill="rgba(255,255,255,.022)"></rect>`).join('')}
+      <rect x="8" y="8" width="${L-16}" height="${A-16}" fill="none" stroke="${linea}" stroke-width="1.5"></rect>
+      <line x1="8" y1="${META}" x2="${L-8}" y2="${META}" stroke="${linea}" stroke-width="1.5"></line>
+      <circle cx="${L/2}" cy="${META}" r="42" fill="none" stroke="${linea}" stroke-width="1.5"></circle>
+      <circle cx="${L/2}" cy="${META}" r="2.5" fill="${linea}"></circle>
+      <rect x="${L/2-64}" y="8" width="128" height="58" fill="none" stroke="${linea}" stroke-width="1.5"></rect>
+      <rect x="${L/2-64}" y="${A-66}" width="128" height="58" fill="none" stroke="${linea}" stroke-width="1.5"></rect>
+      <rect x="${L/2-28}" y="2" width="56" height="6" fill="${linea}"></rect>
+      <rect x="${L/2-28}" y="${A-8}" width="56" height="6" fill="${linea}"></rect>
+      ${pallini(inCampo[0], casacche[0], 0, true,  brevi)}
+      ${pallini(inCampo[1], casacche[1], 1, false, brevi)}
+    </svg>
+    <div class="didascalia">
+      <span class="chi"><span class="pall" style="background:${casacche[0].col}"></span>${casacche[0].nome}</span>
+      <span>contro</span>
+      <span class="chi"><span class="pall" style="background:${casacche[1].col}"></span>${casacche[1].nome}</span>
+      ${fuori}
+    </div>
+  </div>`;
+}
+
 function renderSquadre(){
   const out = $('#squadre-out');
   let teams = null, c = null, bozza = false;
@@ -1196,7 +1323,7 @@ function renderSquadre(){
     `<li class="${p.id===io?'tu':''}">${esc(p.nome)} ${inPorta(p)?'<span class="gkdot">POR</span>':(SIGLE[p.ruolo]?`<span class="rtag">${SIGLE[p.ruolo]}</span>`:'')}${p.ospite?'<span class="ospdot">OSP</span>':''}${
       admin ? `<b>${ovr(p).toFixed(1)}</b>` : ''}</li>`).join('') + '</ol>';
 
-  out.innerHTML = testata + `<div class="teams ${k===3?'tre':''}">` + teams.map((t,i)=> `
+  out.innerHTML = testata + schieramento(teams, k) + `<div class="teams ${k===3?'tre':''}">` + teams.map((t,i)=> `
       <div class="team"><header style="background:${CASACCHE[i].col};color:${CASACCHE[i].testo}">
         <h3>${CASACCHE[i].nome}</h3>${admin ? `<i>${medie[i].toFixed(2)}</i>` : ''}</header>${lista(t)}</div>`).join('') + '</div>' +
     (k === 3 ? tabellone() : '') +
